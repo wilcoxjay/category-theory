@@ -17,7 +17,15 @@ Import ListNotations.
 
 Definition decide {A} R (a a':A) := {R a a'} + {R a a' -> False}.
 
-Global Instance indexEqDec {A} {l:list A} : eqDec (index l).
+Lemma bindIn {A B} {b:B} {l:list A} {f:A->list B} x : In x l -> In b (f x) -> In b (x <- l;; f x).
+  cbn.
+  intros.
+  apply (concatIn (f x)); intuition.
+  apply in_map.
+  intuition.
+Qed.
+
+Global Instance eqDecIndex {A} {l:list A} : eqDec (index l).
   constructor.
   intros i i'.
   induction l; [inversion i|].
@@ -110,6 +118,79 @@ Proof.
   - intros ? ? ? [] ? ?; reflexivity.
 Defined.    
 
+Module PartialMap.
+Section PartialMap.
+  Variable A : Type.
+  
+  Definition PartialMap (B:A->Type) := forall a, option (B a).
+
+  Context `{enumerable A}.
+
+  Definition isSome {T} (v:option T) :=
+    match v with Some _ => true | None => false end.
+
+  Definition size {B} (m:PartialMap B) : nat.
+    refine ((fix rec l := match l with 
+    | [] => 0
+    | a::l' => match m a with 
+                | None => 0 
+                | Some _ => 1 
+                end + rec l'
+    end) enumerate).
+  Defined.
+
+  Lemma emptySize {B} : @size B (fun _ => None) = 0.
+    unfold size.
+    induction enumerate.
+    - reflexivity.
+    - cbn in *.
+      rewrite IHl.
+      reflexivity.
+  Qed.
+
+  Lemma maxSize {B m} : @size B m <= length enumerate.
+  Admitted.
+
+  Lemma fullSize {B m} : @size B m = length enumerate -> forall a, m a <> None.
+    intros h a.
+  Admitted.
+
+  Definition map {B C} (m:PartialMap B) (f:forall a, B a -> C a) : PartialMap C :=
+    fun a => option_map (f a) (m a).
+
+  Lemma mapSize {B C m f} : @size B m = @size C (map m f).
+    unfold map.
+    unfold size.
+    induction enumerate.
+    - reflexivity.
+    - cbn in *.
+      rewrite IHl; clear IHl.
+      f_equal.
+      destruct (m a); reflexivity.
+  Qed.
+
+  Lemma mapNone {B C m k} {f:forall a, B a -> C a} : m k = None -> map m f k = None.
+    intro.
+    unfold map.
+    unfold option_map.
+    break_match; congruence.
+  Qed.
+
+  Context `{eqDec A}.
+
+  Definition update {B} (m:PartialMap B) a (b:B a) : PartialMap B.
+    refine (fun a' => if a =? a' then _ else m a').
+    subst.
+    exact (Some b).
+  Defined.
+
+  Lemma updateSize {B m a b} : m a = None -> size (@update B m a b) = S (size m).
+    intro h.
+    unfold size.
+  Admitted.
+End PartialMap.
+End PartialMap.
+
 Module Graph.
 Section Graph.
 
@@ -131,11 +212,108 @@ Inductive star' {A} {R:A->A->Type} : A -> A -> Type :=
 Definition Path := @star Vertex Edge.
 Definition Path' := @star' Vertex Edge.
 
+Context `{eqDec Vertex}.
 Context `{enumerable Vertex}.
 Context `{forall v v', enumerable (Edge v v')}.
 
 Definition vertices := @enumerate Vertex _.
 Definition edges v v' := @enumerate (Edge v v') _.
+
+Definition nonTrivialPath s d := {d':Vertex & Path' s d' * Edge d' d} % type.
+
+Definition cycle s := nonTrivialPath s s.
+
+Definition Cycle := {s:Vertex & cycle s}.
+
+Fixpoint length {s d} (p:Path s d) : nat :=
+  match p with
+  | refl => 0
+  | step _ p' => S (length p')
+  end.
+
+Import PartialMap.
+Arguments PartialMap [_] _.
+Arguments size [_ _ _] _.
+Arguments map [_ _ _] _ _ _.
+Arguments update [_ _ _] _ _ _ _.
+
+Require Import Omega.
+
+Definition longPathCycle {s d} (p:Path s d) : length p >= List.length vertices -> Cycle.
+  intro h.
+  refine ((fun (m:PartialMap (fun x => nonTrivialPath x s)) (_:size m = 0) => _) (fun _ => None) _); [|shelve].
+  assert (length p + size m >= List.length vertices) by omega.
+  clear h e.
+  induction p as [v|v v' d e p' rec].
+  - cbn in *.
+    refine (match m v as o return m v = o -> Cycle with
+    | Some ntp => fun _ => [v & ntp : cycle v]
+    | None => _
+    end eq_refl).
+    shelve.
+  - refine (match m v as o return m v = o -> Cycle with
+    | Some ntp => fun _ => [v & ntp : cycle v]
+    | None => fun _ => _
+    end eq_refl).
+    refine (let m' : PartialMap (fun x => nonTrivialPath x v') := map m _ in _). {
+      intros x [y [pxy exv]].
+      refine [v & (step' pxy exv, e)].
+    }
+    refine (let m'' := update m' v [v & (refl', e)] in _).
+    refine (rec m'' _).
+    shelve.
+Proof. Unshelve.
+  + clear.
+    apply emptySize.
+  + intro h.
+    exfalso.
+    clear -H3 h.
+    unfold ge in H3.
+    inversion H3.
+    * specialize (@fullSize _ _ _ m); intro.
+      unfold vertices in *.
+      symmetry in H2.
+      specialize (H0 H2 v).
+      congruence.
+    * specialize (@maxSize _ _ _ m); intro.
+      unfold vertices in *.
+      omega.
+  + clear rec.
+    cbn in *.
+    enough (S (size m) = size m'') by omega.
+    symmetry.
+    subst m''.
+    subst m'.
+    match goal with
+    | |- context[map m ?f] => generalize f; intros g
+    end.
+    rewrite (@mapSize _ _ _ _ _ g).
+    apply updateSize.
+    refine (@mapNone _ _ _ _ _ g e0).
+Defined.
+
+Definition Acyclic : option (forall s, cycle s -> False).
+ 
+
+
+
+Definition isCyclic : {s:Vertex & cycle s} + {forall s, cycle s -> False}.
+
+
+
+
+
+
+
+
+
+
+
+
+Find cycles in a dac
+
+
+
 
 Fixpoint reverse {A} (l:list (option A)) : option (list A) :=
   match l with 
@@ -261,26 +439,16 @@ Instance prodDiagram : Diagram := {|
 
 Existing Instance diagramGraph.
 
-
-
-
-
-
-
-
-
-
-
 Goal True.
   refine (let v:list Vertex := enumerate in _).
-  refine (let v:list (Edge ci ai) := enumerate in _).
-
-  Set Printing Width 200.
-
+  refine (let e:list (Edge ci prodi) := enumerate in _).
   vm_compute in v.
-
+  vm_compute in e.
 
   refine (let e := enumerablePaths ci in _).
+
+  Check enumerablePaths.
+
   vm_compute in e.
 
 
