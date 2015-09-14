@@ -1,0 +1,3 @@
+[submodule "CoqStdlib"]
+	path = CoqStdlib
+	url = git@github.com:konne88/CoqStdlib.git
