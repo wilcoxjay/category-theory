@@ -13,7 +13,6 @@ Require Import ListEx.
 Require Import EqDec.
 Require Import CpdtTactics.
 Import ListNotations.
-(* Require Import CategoryTheory. *)
 
 Module Category.
 
@@ -60,29 +59,6 @@ Defined.
 End Category.
 Import Category.
 
-Definition groupBy {A C} `{eqDec A} `{enumerable A} {B:A->Type} (l:list (sigT B)) (f:forall a:A, list (B a) -> C) : list C.
-  refine (a <- enumerate;; _).
-  refine (ret (f a _)).
-  refine (e <- l;; _).
-  destruct e as [a' b].
-  refine (if a =? a' then ret _ else []).
-  subst.
-  exact b.
-Defined.
-
-Definition nonsymmetricNonreflexiveCrossproduct {A} (l:list A) : list (A * A).
-  refine ((fix rec l :=
-    match l with
-    | [] => []
-    | a::l' => _ ++ rec l'
-    end) l).
-  refine ((fix rec' l :=
-    match l with
-    | [] => []
-    | a'::l' => (a,a') :: rec' l'
-    end) l').
-Defined.
-
 Module Graph.
 Section Graph.
 
@@ -96,12 +72,6 @@ Context `{Graph}.
 Inductive Path : Vertex -> Vertex -> Type :=
 | refl {a} : Path a a
 | step  {a b c} : Edge a b -> Path b c -> Path a c.
-
-Context `{enumerable Vertex}.
-Context `{forall v v', enumerable (Edge v v')}.
-
-Definition vertices := @enumerate Vertex _.
-Definition edges v v' := @enumerate (Edge v v') _.
 
 End Graph.
 End Graph.
@@ -127,15 +97,14 @@ Instance diagramGraph : Graph := {|
   Graph.Edge := Arrow
 |}.
 
+Definition vertices := @enumerate Vertex _.
+Definition edges v v' := @enumerate (Edge v v') _.
+
 Fixpoint composePath {s d} (p:Path s d) : vertexObject s → vertexObject d :=
   match p with
   | refl => id
   | step a p' => arrowMorphism a ∘ composePath p'
   end.
-
-Definition commutative := forall s d (p q:Path s d), composePath p = composePath q.
-
-Existing Instance diagramGraph.
 
 Definition listPaths s : list {d : Vertex & Path s d}.
   refine ((fix rec fuel := match fuel
@@ -151,6 +120,29 @@ Definition listPaths s : list {d : Vertex & Path s d}.
   refine (ret [projT1 P & step e (projT2 P)]).
 Defined.
 
+Definition groupBy {A C} `{eqDec A} `{enumerable A} {B:A->Type} (l:list (sigT B)) (f:forall a:A, list (B a) -> C) : list C.
+  refine (a <- enumerate;; _).
+  refine (ret (f a _)).
+  refine (e <- l;; _).
+  destruct e as [a' b].
+  refine (if a =? a' then ret _ else []).
+  subst.
+  exact b.
+Defined.
+
+Definition nonsymmetricNonreflexiveCrossproduct {A} (l:list A) : list (A * A).
+  refine ((fix rec l :=
+    match l with
+    | [] => []
+    | a::l' => _ ++ rec l'
+    end) l).
+  refine ((fix rec' l :=
+    match l with
+    | [] => []
+    | a'::l' => (a,a') :: rec' l'
+    end) l').
+Defined.
+
 Definition denoteDiagram : Prop.
   refine ((fix rec (l:list Prop) := match l with
     | [] => True
@@ -164,12 +156,11 @@ Definition denoteDiagram : Prop.
   refine (composePath P = composePath Q).
 Defined.
 
-Lemma denoteDiagramOk : denoteDiagram <-> forall s d (P Q:Path s d), composePath P = composePath Q.
+Lemma denoteDiagramCommutative : denoteDiagram <-> forall s d (P Q:Path s d), composePath P = composePath Q.
 Admitted.
 
 End Diagram.
 End Diagram.
-
 Import Diagram.
 
 Module Product.
