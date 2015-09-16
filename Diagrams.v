@@ -134,22 +134,23 @@ End Diagram.
 Import Diagram.
 
 Module Product.
-Section ProductDiagram.
+Section Product.
 
 Context `{Category}.
 
-Variable prod : object -> object -> object.
-Variable pair : forall {a b c:object} (p:c → a) (q:c → b), c → prod a b.
-Variable fst : forall {a b:object}, prod a b → a.
-Variable snd : forall {a b:object}, prod a b → b.
+Section ProductDiagram.
 
 Variable a b c:object.
 Variable p:c → a.
 Variable q:c → b.
+Variable prod : object.
+Variable pair : c → prod.
+Variable fst : prod → a.
+Variable snd : prod → b.
 
 Notation "[ a & b ]" := (existT _ a b).
 
-Definition objects := [a; b; c; prod a b].
+Definition objects := [a; b; c; prod].
 Definition Vertex := index objects.
 
 Definition ai : Vertex := found.
@@ -160,9 +161,9 @@ Definition prodi : Vertex := next (next (next found)).
 Definition arrows : list {s:Vertex & {d:Vertex & lookup s → lookup d}} := [
   [ci & [ai & p]];
   [ci & [bi & q]];
-  [ci & [prodi & pair a b c p q]];
-  [prodi & [ai & fst a b]];
-  [prodi & [bi & snd a b]]
+  [ci & [prodi & pair]];
+  [prodi & [ai & fst]];
+  [prodi & [bi & snd]]
 ].
 
 Definition arrowsSection (s d:Vertex) : list (lookup s → lookup d).
@@ -189,32 +190,37 @@ Instance prodDiagram : Diagram := {|
   arrowMorphism x y := lookup
 |}.
 
-Definition productOk := denoteDiagram.
+Definition denoteProdDiagram := denoteDiagram.
 
 End ProductDiagram.
 
-About productOk.
-
-Class Product `{Category} := {
+Class Product := {
   prod : object -> object -> object;
   pair {a b c:object} (p:c → a) (q:c → b) : c → prod a b;
   fst {a b:object} : prod a b → a;
-  snd {a b:object} : prod a b → b;
-  productOk {a b c} {p:c → a} {q:c → b} : productOk prod a b c
-(*  pairUnique {a b c} {p:c → a} {q:c → b} f : 
+  snd {a b:object} : prod a b → b
+(*  productOk {a b c} {p:c → a} {q:c → b} : denoteProdDiagram a b c p q (prod a b) (pair p q) fst snd  *)
+(*  pairUnique {a b c} {p:c → a} {q:c → b} f :  
     f p q ∘ fst = p -> f p q ∘ snd = q -> f p q = factorizer p q *)
 }.
-Opaque morphism.
-Opaque object.
-Opaque composition.
-Opaque id.
-
-End ProductDiagram.
-
-
 
 End Product.
-Import Product.
+About Product.
+
+About Coq.
+
+About Coq.
+
+Instance prodIsProduct : @Product Coq := {|
+  prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
+  pair a b c p q x := (p x, q x);
+  fst := @Datatypes.fst;
+  snd := @Datatypes.snd
+|}.
+Proof.
+  idtac.
+
+@Product Coq.
 
 Instance prodIsProduct : @Product Coq := {|
   prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
@@ -274,6 +280,9 @@ Defined.
 
 
 
+
+End Product.
+Import Product.
 
 
 
