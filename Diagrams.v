@@ -9,11 +9,55 @@ Require Import Misc.
 Require Import JamesTactics.
 Require Import Enumerable.
 Require Import Monad.
-Require Import CategoryTheory.
 Require Import ListEx.
 Require Import EqDec.
 Require Import CpdtTactics.
 Import ListNotations.
+(* Require Import CategoryTheory. *)
+
+Module Category.
+
+Polymorphic Class Category := {
+  object : Type;
+  morphism : object -> object -> Type;
+  id {A} : morphism A A;
+  (* note that composition is defined "the right way" where f ∘ g = \a. g (f a) *)
+  composition {A B C} : morphism A B -> morphism B C -> morphism A C;
+  leftId {A B} {f:morphism A B} : composition id f = f;
+  rightId {A B} {f:morphism A B} : composition f id = f;
+  assoc {A B C D} {f:morphism A B} {g:morphism B C} {h:morphism C D} : composition (composition f g) h = composition f (composition g h)
+}.
+
+Notation "A → B" := (morphism A B) (at level 45).
+Notation "f ∘ g" := (composition f g).
+
+Instance Coq : Category := {|
+  object := Type;
+  morphism A B := A -> B;
+  id A a := a;
+  composition A B C f g a := g (f a)
+|}.
+Proof.
+  all: intros; reflexivity.
+Defined.
+
+Instance co `(Category) : Category := {|
+  object := object;
+  morphism a b := morphism b a;
+  id a := id;
+  composition a b c f g := g ∘ f
+|}.
+Proof.
+  - intros.
+    apply rightId.
+  - intros.
+    apply leftId.
+  - intros.
+    symmetry.
+    apply assoc.
+Defined.
+
+End Category.
 Import Category.
 
 Definition groupBy {A C} `{eqDec A} `{enumerable A} {B:A->Type} (l:list (sigT B)) (f:forall a:A, list (B a) -> C) : list C.
@@ -53,11 +97,6 @@ Inductive Path : Vertex -> Vertex -> Type :=
 | refl {a} : Path a a
 | step  {a b c} : Edge a b -> Path b c -> Path a c.
 
-Inductive Path' : Vertex -> Vertex -> Type :=
-| refl' {a} : Path' a a
-| step'  {a b c} : Edge a b -> Path' b c -> Path' a c.
-
-Context `{eqDec Vertex}.
 Context `{enumerable Vertex}.
 Context `{forall v v', enumerable (Edge v v')}.
 
@@ -148,8 +187,6 @@ Variable pair : c → prod.
 Variable fst : prod → a.
 Variable snd : prod → b.
 
-Notation "[ a & b ]" := (existT _ a b).
-
 Definition objects := [a; b; c; prod].
 Definition Vertex := index objects.
 
@@ -167,20 +204,15 @@ Definition arrows : list {s:Vertex & {d:Vertex & lookup s → lookup d}} := [
 ].
 
 Definition arrowsSection (s d:Vertex) : list (lookup s → lookup d).
-  refine((fix rec l :=
-    match l with
-    | [] => []
-    | i :: l' => _
-    end) arrows).
-  destruct i as [s' [d' f]].
-  specialize (rec l').
+  refine (m <- arrows;; _).
+  destruct m as [s' [d' m]].
   refine (match (s, d) =? (s', d') with
-  | left e => _ :: rec 
-  | right _ => rec end
-  ).
+  | left e => ret _
+  | right _ => []
+  end).
   inversion e.
   subst.
-  exact f.
+  exact m.
 Defined.
 
 Instance prodDiagram : Diagram := {|
@@ -198,18 +230,13 @@ Class Product := {
   prod : object -> object -> object;
   pair {a b c:object} (p:c → a) (q:c → b) : c → prod a b;
   fst {a b:object} : prod a b → a;
-  snd {a b:object} : prod a b → b
-(*  productOk {a b c} {p:c → a} {q:c → b} : denoteProdDiagram a b c p q (prod a b) (pair p q) fst snd  *)
-(*  pairUnique {a b c} {p:c → a} {q:c → b} f :  
-    f p q ∘ fst = p -> f p q ∘ snd = q -> f p q = factorizer p q *)
+  snd {a b:object} : prod a b → b;
+  productOk {a b c} {p:c → a} {q:c → b} : denoteProdDiagram a b c p q (prod a b) (pair p q) fst snd;
+  pairUnique {a b c} {p:c → a} {q:c → b} f :
+    f p q ∘ fst = p -> f p q ∘ snd = q -> f p q = pair p q
 }.
 
 End Product.
-About Product.
-
-About Coq.
-
-About Coq.
 
 Instance prodIsProduct : @Product Coq := {|
   prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
@@ -218,25 +245,13 @@ Instance prodIsProduct : @Product Coq := {|
   snd := @Datatypes.snd
 |}.
 Proof.
-  idtac.
-
-@Product Coq.
-
-Instance prodIsProduct : @Product Coq := {|
-  prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
-  factorizer a b c p q x := (p x, q x);
-  fst := @Datatypes.fst;
-  snd := @Datatypes.snd
-|}.
-Proof.  
-  - compute.
-    intros.
-    extensionality x.
-    reflexivity.
-  - compute.
-    intros.
-    extensionality x.
-    reflexivity.
+  - intros.
+    Opaque morphism object composition id Datatypes.fst Datatypes.snd.
+    (* pair p q ∘ fst = p /\ pair p q ∘ snd = q *)
+    compute.
+    Transparent morphism object composition id Datatypes.fst Datatypes.snd.
+    compute.
+    constructor; reflexivity.
   - compute.
     intros ? ? ? ? ? f h h'.
     extensionality x.
@@ -254,18 +269,13 @@ Definition sumIsSum : @Sum Coq.
   unfold Sum.
   refine {|
     prod := sum : @object (co Coq) -> @object (co Coq) -> @object (co Coq);
-    factorizer a b c p q x := match x with inl a => p a | inr b => q b end;
+    pair a b c p q x := match x with inl a => p a | inr b => q b end;
     fst := @inl;
     snd := @inr
   |}.
   - compute. 
     intros.
-    extensionality x.
-    reflexivity.
-  - compute. 
-    intros.
-    extensionality x.
-    reflexivity.
+    constructor; reflexivity.
   - compute.
     intros ? ? ? ? ? f h h'.
     extensionality x.
@@ -278,46 +288,4 @@ Definition sumIsSum : @Sum Coq.
       reflexivity.
 Defined.
 
-
-
-
 End Product.
-Import Product.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Instance prodIsProduct : @Product Coq := {|
-  prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
-  factorizer a b c p q x := (p x, q x);
-  fst := @Datatypes.fst;
-  snd := @Datatypes.snd
-|}.
-Proof.  
-
-
-(*
-  fstOk {a b c} {p:c → a} {q:c → b} : factorizer p q ∘ fst = p;
-  sndOk {a b c} {p:c → a} {q:c → b} : factorizer p q ∘ snd = q;
-  pairUnique {a b c} {p:c → a} {q:c → b} f : 
-    f p q ∘ fst = p -> f p q ∘ snd = q -> f p q = factorizer p q
-*)
-
-Instance prodIsProduct : @Product Coq := {|
-  prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
-  factorizer a b c p q x := (p x, q x);
-  fst := @Datatypes.fst;
-  snd := @Datatypes.snd
-|}.
-Proof.  
