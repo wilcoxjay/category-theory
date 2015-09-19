@@ -13,6 +13,13 @@ Require Import ListEx.
 Require Import EqDec.
 Require Import CpdtTactics.
 Import ListNotations.
+Require Import ZArith.
+
+Fixpoint findIndecies {A} `{eqDec A} (a:A) (l:list A) : list (ListEx.index l) :=
+  match l with
+  | [] => []
+  | a'::l' => (if a =? a' then cons found else id) (@next _ _ _ <$> (findIndecies a l'))
+  end.
 
 Module Category.
 
@@ -80,14 +87,16 @@ Import Graph.
 Module Diagram.
 Section Diagram.
 
-Class Diagram `{Category} := {
+Context `{Category}.
+
+Class Diagram := {
   Vertex : Type;
   vertexObject : Vertex -> object;
   Arrow : Vertex -> Vertex -> Type;
   arrowMorphism {a b} : Arrow a b -> (vertexObject a) → (vertexObject b)
 }.
 
-Context `{Diagram}.
+Variable D:Diagram.
 Context `{eqDec Vertex}.
 Context `{enumerable Vertex}.
 Context `{forall v v', enumerable (Arrow v v')}.
@@ -101,7 +110,7 @@ Definition vertices := @enumerate Vertex _.
 Definition edges v v' := @enumerate (Edge v v') _.
 
 Fixpoint composePath {s d} (p:Path s d) : vertexObject s → vertexObject d :=
-  match p with
+  match p in Path s d return vertexObject s → vertexObject d with
   | refl => id
   | step a p' => arrowMorphism a ∘ composePath p'
   end.
@@ -163,6 +172,11 @@ End Diagram.
 End Diagram.
 Import Diagram.
 
+Module Direction.
+Inductive Direction := north | east | south | west.
+End Direction.
+Import Direction.
+
 Module Product.
 Section Product.
 
@@ -170,11 +184,10 @@ Context `{Category}.
 
 Section ProductDiagram.
 
-Variable a b c:object.
+Variable c a prod b:object.
 Variable p:c → a.
-Variable q:c → b.
-Variable prod : object.
 Variable pair : c → prod.
+Variable q:c → b.
 Variable fst : prod → a.
 Variable snd : prod → b.
 
@@ -194,35 +207,227 @@ Definition arrows : list {s:Vertex & {d:Vertex & lookup s → lookup d}} := [
   [prodi & [bi & snd]]
 ].
 
-Definition arrowsSection (s d:Vertex) : list (lookup s → lookup d).
-  refine (m <- arrows;; _).
-  destruct m as [s' [d' m]].
+Definition section {A} `{eqDec A} {B:A->A->Type} (l:list {s:A & {d:A & B s d}}) (s d:A) : list (B s d).
+  refine (v <- l;; _).
+  destruct v as [s' [d' v]].
   refine (match (s, d) =? (s', d') with
   | left e => ret _
   | right _ => []
   end).
   inversion e.
   subst.
-  exact m.
+  exact v.
 Defined.
 
 Instance prodDiagram : Diagram := {|
   Diagram.Vertex := Vertex;
   vertexObject := lookup;
-  Arrow s d := index (arrowsSection s d);
+  Arrow s d := index (section arrows s d);
   arrowMorphism x y := lookup
 |}.
 
-Definition denoteProdDiagram := denoteDiagram.
+Definition denoteProdDiagram := denoteDiagram prodDiagram.
 
 End ProductDiagram.
+
+Section ProductImage.
+
+Require Import String.
+Require Import Ascii.
+
+Definition Z_to_nat (z:Z) : option nat :=
+  match z with
+  | 0%Z => Some 0
+  | Z.pos p => Some (Pos.to_nat p)
+  | Z.neg _ => None
+  end.
+
+Definition imgMap (img:list string) (x:Z*Z) : ascii. 
+  destruct x as [x y].
+  destruct (Z_to_nat x) as [x'|]; [|exact " "%char].
+  destruct (Z_to_nat y) as [y'|]; [|exact " "%char].
+  refine (let s := nth y' img " "%string in _). 
+  destruct (get x' s) as [cc|]; [|exact " "%char].
+  exact cc.
+Defined.
+
+Instance eqDecAscii : eqDec ascii.
+  constructor.
+  apply ascii_dec.
+Defined.
+
+Definition points (w h:nat) (m:(Z*Z)->ascii) : list (Z*Z).
+  refine (y <- seq 0 h;; _).
+  refine (x <- seq 0 w;; _).
+  refine (let x' := Z.of_nat x in let y' := Z.of_nat y in _). 
+  refine (if m (x',y') =? "o" % char then ret (x',y') else []).
+Defined.
+
+Instance enumerableDirection : enumerable Direction :=
+  {| enumerate := [west; south; east; north] |}.
+Proof.
+  intros []; intuition.
+Defined.
+
+Definition directionEdgeChar d :=
+  match d with
+  | north => "|"
+  | east => "-"
+  | south => "|"
+  | west => "-"
+  end % char.
+
+Definition directionEdgeEndChar d :=
+  match d with
+  | north => "^"
+  | east => ">"
+  | south => "v"
+  | west => "<"
+  end % char.
+
+Definition directionMove (d:Direction) (x:Z*Z) : Z*Z.
+  destruct x as [x y].
+  exact match d with
+  | north => (x, Z.pred y)
+  | east => (Z.succ x, y)
+  | south => (x, Z.succ y)
+  | west => (Z.pred x, y)
+  end.
+Defined.
+
+Definition directionFlip (d:Direction) : Direction :=
+  match d with
+  | north => south
+  | east => west
+  | south => north
+  | west => east
+  end.
+
+Instance eqDecDirection : eqDec Direction.
+  constructor.
+  decide equality.
+Defined.
+
+Fixpoint traceEdges (fuel:nat) (m:(Z*Z)->ascii) (ps:list (Z*Z)) {struct fuel} : list ((Z*Z)*(Z*Z)).
+  refine (s <- ps;; _).
+  refine (d <- @enumerate Direction _;; _).
+  refine (_ fuel (directionMove d s) d).
+  clear d fuel.
+  refine (fix rec fuel x d :=
+    match fuel with
+    | 0 => []
+    | S fuel' => _
+    end).
+  specialize (rec fuel').
+  refine (if m x =? "+"%char then _ else _).
+  - refine (d' <- @enumerate Direction _;; _).
+    refine (if directionFlip d =? d' then [] else _).
+    exact (rec (directionMove d' x) d').
+  - refine (if m x =? directionEdgeChar d then _ else
+            if m x =? directionEdgeEndChar d then _ else []).
+    + exact (rec (directionMove d x) d).
+    + exact (ret (s,directionMove d x)).
+Defined.
+
+Definition img : list string := [
+  "        c        ";
+  "    +---o---+    ";
+  "  p |   |   | q  ";
+  " +--+   |   +--+ ";
+  " |      |      | ";
+  " |      |pair  | ";
+  " v      v      v ";
+  " o<-----o----->o ";
+  " a     prd     b "
+] % string.
+
+Instance eqDecZ : eqDec Z.
+  constructor.
+  decide equality;
+  decide equality.
+Defined.
+
+Existing Instance eqDecProd.
+
+Definition parseImage (img:list string) : list (Z*Z) * list ((Z*Z)*(Z*Z)).
+  refine (let m := imgMap img in _).
+  refine (let h := List.length img in _).
+  refine (let w := String.length (nth 0 img " "%string) in _).
+  refine (let ps := points w h m in _).
+  refine (let es := traceEdges (w*h) m ps in _).
+  refine (ps, es).
+Defined.
+
+Definition parseDiagramType (img:list string) : Type.
+  destruct (parseImage img) as [ps es].
+  revert ps.
+  refine ((fix rec os (om:(Z*Z) -> option (ListEx.index os)) ps := 
+    match ps with
+    | [] => _
+    | x::ps' => forall o:object, rec (o::os) _ ps'
+    end) [] (fun _ => None)); revgoals. 
+  {
+    refine (fun x' => if x =? x' then Some found else (om x') >>= _).
+    exact (fun oi => Some (next oi)).
+  }
+  clear rec ps.
+  revert es.
+  refine (fix rec es := 
+    match es with
+    | [] => Diagram
+    | (s,d)::es' => (fun T => _) (rec es')
+    end).
+  destruct (om s) as [si|]; [|exact T].
+  destruct (om d) as [di|]; [|exact T].
+  refine (forall m : lookup si → lookup di, T).
+Defined.
+
+Definition parseDiagram (img:list string) : parseDiagramType img.
+  unfold parseDiagramType.
+  destruct (parseImage img) as [ps es].
+  match goal with |- _ ?os ?om ?ps => revert ps; generalize om; generalize os end.
+  refine (fix rec os om ps {struct ps} := 
+    match ps with
+    | [] => _
+    | x::ps' => _
+    end); revgoals. {
+    refine (fun o:object => rec _ _ _).
+  }
+  clear rec ps.
+  revert es.
+  refine ((fix rec (ms:list {s:ListEx.index os & {d:ListEx.index os & lookup s → lookup d}}) es {struct es} := 
+    match es with
+    | [] => _
+    | (s,d)::es' => _
+    end) []); revgoals. {
+    destruct (om s) as [si|]; [|exact (rec ms es')].
+    destruct (om d) as [di|]; [|exact (rec ms es')].
+    refine (fun m => rec ([si & [di & m]]::ms) es').
+  }
+  clear rec es om.
+  refine {|
+    Diagram.Vertex := ListEx.index os;
+    vertexObject := lookup;
+    Arrow s d := ListEx.index (section ms s d);
+    arrowMorphism x y := lookup
+  |}.
+Defined.
+
+Goal True.
+  refine (let ps := points 20 20 (imgMap img) in _).  
+  compute in ps.
+  refine (let r := parseImage img in _).  
+  compute in r.
+Abort.
+
+End ProductImage.
 
 Class Product := {
   prod : object -> object -> object;
   pair {a b c:object} (p:c → a) (q:c → b) : c → prod a b;
   fst {a b:object} : prod a b → a;
   snd {a b:object} : prod a b → b;
-  productOk {a b c} {p:c → a} {q:c → b} : denoteProdDiagram a b c p q (prod a b) (pair p q) fst snd;
+  productOk {a b c} {p:c → a} {q:c → b} : denoteDiagram (parseDiagram img (* denoteProdDiagram *) c a (prod a b) b p (pair p q) q fst snd);
   pairUnique {a b c} {p:c → a} {q:c → b} f :
     f p q ∘ fst = p -> f p q ∘ snd = q -> f p q = pair p q
 }.
