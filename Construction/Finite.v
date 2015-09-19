@@ -1,5 +1,7 @@
 Require Import Category.
 
+Set Universe Polymorphism.
+
 Instance One : Category := {|
   object := unit;
   morphism a b := unit;

@@ -4,6 +4,8 @@ Require Import ProofIrrelevance.
 Require Import FunctionalExtensionality.
 Require Import List.
 
+Set Universe Polymorphism.
+
 Class Functor (C D:Category) := {
   fobj : @object C -> @object D;
   fmap {a b} : (a → b) -> (fobj a → fobj b);

@@ -1,6 +1,8 @@
 Require Import Category.
 Require Import FunctionalExtensionality.
 
+Set Universe Polymorphism.
+
 Instance co `(Category) : Category := {|
   object := object;
   morphism a b := morphism b a;

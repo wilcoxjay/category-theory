@@ -1,6 +1,8 @@
 Require Import Category.
 Require Import Coq.
 
+Set Universe Polymorphism.
+
 Class Isomorphism `{Category} (a b:object):= {
   f : a → b;
   g : b → a;

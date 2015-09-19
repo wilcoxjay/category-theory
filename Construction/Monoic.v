@@ -4,6 +4,8 @@ Require Import Category.
 Require Import Coq.
 Require Import Co.
 
+Set Universe Polymorphism.
+
 Definition monoic (C:Category) {a b} (m:b → a) := forall {c} {f g:c → b}, f ∘ m = g ∘ m -> f = g.
 
 Definition epi (C:Category) {a b} (m:a → b) := forall {c} {f g:b → c}, m ∘ f = m ∘ g -> f = g.

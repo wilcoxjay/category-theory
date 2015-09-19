@@ -3,6 +3,8 @@ Require Import Category.
 Require Import Functor.
 Require Import Coq.
 
+Set Universe Polymorphism.
+
 Instance CatProduct (C D:Category) : Category := {
   object := @object C * @object D;
   morphism A B := ((fst A → fst B) * (snd A → snd B)) % type;

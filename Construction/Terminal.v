@@ -6,6 +6,8 @@ Require Import Isomorphism.
 Require Import Coq.
 Require Import Co.
 
+Set Universe Polymorphism.
+
 Class Terminal `{Category} := {
   terminal : object;
   receivesAll o : o → terminal;

@@ -1,6 +1,8 @@
 Require Import Program.
 
-Polymorphic Class Category := {
+Set Universe Polymorphism.
+
+Class Category := {
   object : Type;
   morphism : object -> object -> Type;
   id {A} : morphism A A;

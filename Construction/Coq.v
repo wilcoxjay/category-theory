@@ -1,5 +1,7 @@
 Require Import Category.
 
+Set Universe Polymorphism.
+
 Instance Coq : Category := {|
   object := Type;
   morphism A B := A -> B;

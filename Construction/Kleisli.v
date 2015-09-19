@@ -1,9 +1,12 @@
 Require Import Program.
 Require Import FunctionalExtensionality.
+Require Import ProofIrrelevance.
 Require Import Monad.
 Require Import Category.
 Require Import Functor.
 Require Import Isomorphism.
+
+Set Universe Polymorphism.
 
 Instance KleisliCategory T `{Monad T} : Category := {|
   object := Type;
@@ -60,8 +63,23 @@ Example composeMaybe4 : const (id 5) ∘ const (id 4) = const (id 4)   :> (nat -
   compute; reflexivity.
 Defined. 
 
-(* Print Isomorphism.
-
-Definition maybeCatKleisliIso : @Isomorphism Cat maybeCat (KleisliCategory option).
-*)
-
+Instance maybeCatKleisliIso : @Isomorphism Cat maybeCat (KleisliCategory option) := {|
+  f := _;
+  g := _
+|}.
+Proof.
+  - refine {| fobj o := _; fmap a b f := _ |}.
+    + exact o.
+    + exact f.
+    + reflexivity.
+    + reflexivity.
+  - refine {| fobj o := _; fmap a b f := _ |}.
+    + exact o.
+    + exact f.
+    + reflexivity.
+    + reflexivity.
+  - compute.
+    reflexivity.
+  - compute.
+    reflexivity.
+Defined.
