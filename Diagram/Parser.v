@@ -24,6 +24,10 @@ Require Import Ascii.
 
 Set Universe Polymorphism.
 
+Section Parse.
+
+Context `{Category}.
+
 Inductive Direction := north | east | south | west.
 
 Instance enumerableDirection : enumerable Direction :=
@@ -93,7 +97,6 @@ Definition directionFlip (d:Direction) : Direction :=
   | south => north
   | west => east
   end.
-
 
 Fixpoint traceEdges (fuel:nat) (m:(Z*Z)->ascii) (ps:list (Z*Z)) {struct fuel} : list ((Z*Z)*(Z*Z)).
   refine (s <- ps;; _).
@@ -192,3 +195,4 @@ Definition parseDiagram (img:list string) : parseDiagramType img.
   |}.
 Defined.
 
+End Parse.

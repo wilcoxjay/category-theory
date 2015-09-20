@@ -12,8 +12,21 @@ Require Import Co.
 Require Import Diagram.
 Require Import Diagram.Parser.
 
-Set Universe Polimorphism.
+Set Universe Polymorphism.
 
+Module SimpleProduct.
+Class Product `{Category} := {
+  bundle : object -> object -> object;
+  factor {a b c:object} (p:c → a) (q:c → b) : c → bundle a b;
+  projL {a b:object} : bundle a b → a;
+  projR {a b:object} : bundle a b → b;
+  productOk {a b c} {p:c → a} {q:c → b} : factor p q ∘ projL = p /\ factor p q ∘ projR = q;
+  pairUnique {a b c} {p:c → a} {q:c → b} f : 
+    f p q ∘ projL = p -> f p q ∘ projR = q -> f p q = factor p q
+}.
+End SimpleProduct.
+
+Module ImmediateDiagramProduct.
 Section ImmediateDiagram.
 
 Context `{Category}.
@@ -50,40 +63,61 @@ Definition immediateDiagram : Diagram := {|
 
 End ImmediateDiagram.
 
-Definition imageDiagram := parseDiagram [
-  "        c        ";
-  "    +---o---+    ";
-  "  p |   |   | q  ";
-  " +--+   |   +--+ ";
-  " |      |      | ";
-  " |      |pair  | ";
-  " v      v      v ";
-  " o<-----o----->o ";
-  " a     prd     b "
-] % string.
-
 Class Product `{Category} := {
-  prod : object -> object -> object;
-  pair {a b c:object} (p:c → a) (q:c → b) : c → prod a b;
-  fst {a b:object} : prod a b → a;
-  snd {a b:object} : prod a b → b;
-  productOk {a b c} {p:c → a} {q:c → b} : pair p q ∘ fst = p -> pair p q ∘ snd = q;
-(*  productOk {a b c} {p:c → a} {q:c → b} : denote (ImmediateDiagram.diagram c a (prod a b) b p (pair p q) q fst snd); *)
-(* productOk {a b c} {p:c → a} {q:c → b} : denoteDiagram (parseDiagram img (* denoteProdDiagram *) c a (prod a b) b p (pair p q) q fst snd); *)
+  bundle : object -> object -> object;
+  factor {a b c:object} (p:c → a) (q:c → b) : c → bundle a b;
+  projL {a b:object} : bundle a b → a;
+  projR {a b:object} : bundle a b → b;
+  productOk {a b c} {p:c → a} {q:c → b} : denote (immediateDiagram c a (bundle a b) b p (factor p q) q projL projR);
   pairUnique {a b c} {p:c → a} {q:c → b} f : 
-    f p q ∘ fst = p -> f p q ∘ snd = q -> f p q = pair p q
+    f p q ∘ projL = p -> f p q ∘ projR = q -> f p q = factor p q
 }.
 
+End ImmediateDiagramProduct.
+
+About parseDiagram.
+About denote.
+
+Class Product `{Category} := {
+  bundle : object -> object -> object;
+  factor {a b c:object} (p:c → a) (q:c → b) : c → bundle a b;
+  projL {a b:object} : bundle a b → a;
+  projR {a b:object} : bundle a b → b;
+  productOk {a b c} {p:c → a} {q:c → b} : denote (parseDiagram ([
+    "        c        ";
+    "    +---o---+    ";
+    "  p |   |   | q  ";
+    " +--+   |   +--+ ";
+    " |      |      | ";
+    " |      |pair  | ";
+    " v      v      v ";
+    " o<-----o----->o ";
+    " a     prd     b "
+    ] % string) c a (bundle a b) b p (factor p q) q projL projR);
+  pairUnique {a b c} {p:c → a} {q:c → b} f : 
+    f p q ∘ projL = p -> f p q ∘ projR = q -> f p q = factor p q
+}.
+
+Record prod A B := pair {fst:A; snd:B}.
+Arguments pair [_ _] _ _.
+Arguments fst [_ _] _.
+Arguments snd [_ _] _.
+
+Inductive sum A B := 
+| inl : A -> sum A B
+| inr : B -> sum A B.
+Arguments inl [_ _] _.
+Arguments inr [_ _] _.
+
 Instance prodIsProduct : @Product Coq := {|
-  prod := Datatypes.prod : @object Coq -> @object Coq -> @object Coq;
-  pair a b c p q x := (p x, q x);
-  fst := @Datatypes.fst;
-  snd := @Datatypes.snd
+  bundle := prod : @object Coq -> @object Coq -> @object Coq;
+  factor a b c p q x := pair (p x) (q x);
+  projL := fst;
+  projR := snd
 |}.
 Proof.
   - intros.
     Opaque morphism object composition id Datatypes.fst Datatypes.snd.
-    (* pair p q ∘ fst = p /\ pair p q ∘ snd = q *)
     compute.
     Transparent morphism object composition id Datatypes.fst Datatypes.snd.
     compute.
@@ -102,12 +136,11 @@ Defined.
 Definition Sum {C:Category} := @Product (co C).
 
 Definition sumIsSum : @Sum Coq.
-  unfold Sum.
   refine {|
-    prod := _;
-    pair := _;
-    fst := _;
-    snd := _
+    bundle := _;
+    factor := _;
+    projL := _;
+    projR := _
   |}.
   - exact sum.
   - exact (fun a b c p q x => match x with inl a => p a | inr b => q b end).
