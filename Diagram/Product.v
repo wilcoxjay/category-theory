@@ -103,12 +103,6 @@ Arguments pair [_ _] _ _.
 Arguments fst [_ _] _.
 Arguments snd [_ _] _.
 
-Inductive sum A B := 
-| inl : A -> sum A B
-| inr : B -> sum A B.
-Arguments inl [_ _] _.
-Arguments inr [_ _] _.
-
 Instance prodIsProduct : @Product Coq := {|
   bundle := prod : @object Coq -> @object Coq -> @object Coq;
   factor a b c p q x := pair (p x) (q x);
@@ -117,9 +111,9 @@ Instance prodIsProduct : @Product Coq := {|
 |}.
 Proof.
   - intros.
-    Opaque morphism object composition id Datatypes.fst Datatypes.snd.
+    Opaque morphism object composition id fst snd.
     compute.
-    Transparent morphism object composition id Datatypes.fst Datatypes.snd.
+    Transparent morphism object composition id fst snd.
     compute.
     constructor; reflexivity.
   - compute.
@@ -133,19 +127,18 @@ Proof.
     reflexivity.
 Defined.
 
-Definition Sum {C:Category} := @Product (co C).
+Inductive sum A B := 
+| inl : A -> sum A B
+| inr : B -> sum A B.
+Arguments inl [_ _] _.
+Arguments inr [_ _] _.
 
-Definition sumIsSum : @Sum Coq.
-  refine {|
-    bundle := _;
-    factor := _;
-    projL := _;
-    projR := _
-  |}.
-  - exact sum.
-  - exact (fun a b c p q x => match x with inl a => p a | inr b => q b end).
-  - exact @inl.
-  - exact @inr.
+Instance sumIsCoProduct : @Product (co Coq) := {|
+  bundle := sum : @object (co Coq) -> @object (co Coq) -> @object (co Coq);
+  factor a b c p q x := match x with inl a => p a | inr b => q b end;
+  projL := @inl;
+  projR := @inr
+|}.
 Proof.
   - compute. 
     intros.
@@ -161,3 +154,5 @@ Proof.
       rewrite <- h.
       reflexivity.
 Defined.
+
+Definition Sum {C:Category} := @Product (co C).
