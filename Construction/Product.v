@@ -76,27 +76,25 @@ Class Product `{Category} := {
 
 End ImmediateDiagramProduct.
 
-About parseDiagram.
-About denote.
-
 Class Product `{Category} := {
   bundle : object -> object -> object;
   factor {a b c:object} (p:c → a) (q:c → b) : c → bundle a b;
   projL {a b:object} : bundle a b → a;
   projR {a b:object} : bundle a b → b;
-  productOk {a b c} {p:c → a} {q:c → b} : denote (parseDiagram ([
-    "        c        ";
-    "    +---o---+    ";
-    "  p |   |   | q  ";
-    " +--+   |   +--+ ";
-    " |      |      | ";
-    " |      |pair  | ";
-    " v      v      v ";
-    " o<-----o----->o ";
-    " a     prd     b "
-    ] % string) c a (bundle a b) b p (factor p q) q projL projR);
   pairUnique {a b c} {p:c → a} {q:c → b} f : 
-    f p q ∘ projL = p -> f p q ∘ projR = q -> f p q = factor p q
+    f p q ∘ projL = p -> f p q ∘ projR = q -> f p q = factor p q;
+  productOk {a b c} {p:c → a} {q:c → b} : denote (parseDiagram ([
+    "                       ";
+    "     p     c     q     ";
+    "  +--------o--------+  ";
+    "  |        |        |  ";
+    "  |        |factr   |  ";
+    "  |        |        |  ";
+    "  v  prjL  v  prjR  v  ";
+    "  o<-------o------->o  ";
+    "  a      bundle     b  ";
+    "                       "
+    ] % string) c a (bundle a b) b p (factor p q) q projL projR)
 }.
 
 Record prod A B := pair {fst:A; snd:B}.
@@ -111,12 +109,6 @@ Instance prodIsProduct : @Product Coq := {|
   projR := snd
 |}.
 Proof.
-  - intros.
-    Opaque morphism object composition id fst snd.
-    compute.
-    Transparent morphism object composition id fst snd.
-    compute.
-    constructor; reflexivity.
   - compute.
     intros ? ? ? ? ? f h h'.
     extensionality x.
@@ -126,7 +118,13 @@ Proof.
     rewrite <- h'.
     destruct (f p q x).
     reflexivity.
-Defined.
+  - Opaque morphism object composition id fst snd.
+    intros. 
+    compute. 
+    Transparent morphism object composition id fst snd.
+    compute.
+    constructor; reflexivity.
+ efined.
 
 Inductive sum A B := 
 | inl : A -> sum A B
@@ -175,6 +173,25 @@ Proof.
     cbn.
     f_equal; apply Category.assoc.
 Defined.
+
+Instance catProductIsProduct : @Product Cat := {|
+  bundle := CatProduct : @object Cat -> @object Cat -> @object Cat;
+  factor a b c p q := {|
+      fobj x := _;
+      fmap x y f := _ 
+    |};
+  projL x := _;
+  projR x := _
+|}.
+Proof.
+  - cbn in *. 
+    exact (pair (@fobj _ _ p x) (@fobj _ _ q x)).
+  - cbn in *.
+    exact (pair (@fmap _ _ p _ _ f) (@fmap _ _ q _ _ f)).
+  - shelve.
+  - shelve.
+  - cbn in *.
+Admitted.
 
 Definition BiFunctor A B C := Functor (CatProduct A B) C.
 
