@@ -88,6 +88,22 @@ Fixpoint all_list (l : list Prop) : Prop :=
   | h::l' => h /\ all_list l'
   end.
 
+Fixpoint pathEnumEq (n : nat) s {struct n} : list {d : Vertex & Path s d} :=
+  match n with
+  | O => ret [s & refl]
+  | S n' => (m <- @enumerate Vertex _ ;;
+             e <- @enumerate (Arrow s m) _ ;;
+             p' <- pathEnumEq n' m ;;
+             ret [projT1 p' & step e (projT2 p')])
+  end.
+
+Fixpoint pathEnumLe (n : nat) s {struct n} : list {d : Vertex & Path s d} :=
+  pathEnumEq n s ++
+  match n with
+  | O => []
+  | S n' => pathEnumLe n' s
+  end.
+
 Definition denote : Prop.
   refine (all_list _).
   refine (v <- @enumerate Vertex _;; _).
