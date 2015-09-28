@@ -88,6 +88,12 @@ Fixpoint all_list (l : list Prop) : Prop :=
   | h::l' => h /\ all_list l'
   end.
 
+Fixpoint pathLength {s d} (p : Path s d) {struct p} : nat :=
+   match p with
+   | refl => O
+   | step e p' => S (pathLength p')
+   end.
+
 Fixpoint pathEnumEq (n : nat) s {struct n} : list {d : Vertex & Path s d} :=
   match n with
   | O => ret [s & refl]
