@@ -12,6 +12,8 @@ Require Import Co.
 
 Set Universe Polymorphism.
 
+Definition acyclic (G : Graph) : Prop := forall v (p : Path v v), p = refl.
+
 Section Diagram.
 
 Context `{Category}.
