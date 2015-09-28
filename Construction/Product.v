@@ -124,7 +124,7 @@ Proof.
     Transparent morphism object composition id fst snd.
     compute.
     constructor; reflexivity.
- efined.
+Defined.
 
 Inductive sum A B := 
 | inl : A -> sum A B
@@ -139,9 +139,6 @@ Instance sumIsCoProduct : @Product (co Coq) := {|
   projR := @inr
 |}.
 Proof.
-  - compute. 
-    intros.
-    constructor; reflexivity.
   - compute.
     intros ? ? ? ? ? f h h'.
     extensionality x.
@@ -152,6 +149,9 @@ Proof.
     + specialize (equal_f h' r); clear h; intro h.
       rewrite <- h.
       reflexivity.
+  - compute. 
+    intros.
+    constructor; reflexivity.
 Defined.
 
 Definition Sum {C:Category} := @Product (co C).
