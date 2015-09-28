@@ -79,12 +79,15 @@ Definition nonsymmetricNonreflexiveCrossproduct {A} (l:list A) : list (A * A).
     end) l').
 Defined.
 
+Fixpoint all_list (l : list Prop) : Prop :=
+  match l with
+  | [] => True
+  | [h] => h
+  | h::l' => h /\ all_list l'
+  end.
+
 Definition denote : Prop.
-  refine ((fix rec (l:list Prop) := match l with
-    | [] => True
-    | [h] => h
-    | h::l' => h /\ rec l'
-    end) _).
+  refine (all_list _).
   refine (v <- @enumerate Vertex _;; _).
   refine (concat (groupBy (listPaths v) (fun v' ps => _))).
   refine (_ <$> nonsymmetricNonreflexiveCrossproduct ps).
