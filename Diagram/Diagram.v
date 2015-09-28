@@ -10,6 +10,9 @@ Require Import Category.
 Require Import Coq.
 Require Import Co.
 
+Require Import JamesTactics.
+Require Import Omega.
+
 Set Universe Polymorphism.
 
 Definition acyclic (G : Graph) : Prop := forall v (p : Path v v), p = refl.
@@ -103,12 +106,61 @@ Fixpoint pathEnumEq (n : nat) s {struct n} : list {d : Vertex & Path s d} :=
              ret [projT1 p' & step e (projT2 p')])
   end.
 
+Lemma pathEnumEq_complete :
+  forall s d (p : Path s d),
+    In [d & p] (pathEnumEq (pathLength p) s).
+Proof.
+  intros.
+  remember (pathLength p) as n. generalize dependent s. generalize dependent d.
+  induction n; intros; destruct p; simpl in *.
+  - auto.
+  - discriminate.
+  - discriminate.
+  - eapply concatIn; [|apply in_map with (x := b); apply enumerateContainsEverything].
+    eapply concatIn; [|apply in_map with (x := e); apply enumerateContainsEverything].
+    eapply concatIn; [|apply in_map with (x := [c & p])].
+    + simpl. auto.
+    + auto.
+Qed.
+
 Fixpoint pathEnumLe (n : nat) s {struct n} : list {d : Vertex & Path s d} :=
   pathEnumEq n s ++
   match n with
   | O => []
   | S n' => pathEnumLe n' s
   end.
+
+Lemma pathEnumLe_cumulative :
+  forall m n,
+    n <= m ->
+    forall s p,
+    In p (pathEnumLe n s) ->
+    In p (pathEnumLe m s).
+Proof.
+  induction 1.
+  - auto.
+  - intros. simpl. apply in_or_app. right. auto.
+Qed.
+
+Lemma pathEnumLe_includes_pathEnumEq :
+  forall n s p,
+    In p (pathEnumEq n s) ->
+    In p (pathEnumLe n s).
+Proof.
+  unfold pathEnumLe; intros; destruct n; simpl in *; auto.
+  apply in_or_app. left. auto.
+Qed.
+
+Lemma pathEnumLe_complete :
+  forall n s d (p : Path s d),
+    pathLength p <= n ->
+    In [d & p] (pathEnumLe n s).
+Proof.
+  intros.
+  apply pathEnumLe_cumulative with (n := pathLength p); auto.
+  apply pathEnumLe_includes_pathEnumEq.
+  apply pathEnumEq_complete.
+Qed.
 
 Definition denote : Prop.
   refine (all_list _).
